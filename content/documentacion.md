@@ -44,7 +44,7 @@ Además, se produce un reporte resumen en formato Markdown con las estadísticas
 python get_data.py
 ```
 
- Crea un fichero Excel con 5000 encuestas en `data/raw/encuestas_YYYYMM.xlsx`.
+ Crea un fichero Excel con encuestas en `data/raw/encuestas_YYYYMM.xlsx`.
 
  Ejecución del proceso ETL (run.py):
 
