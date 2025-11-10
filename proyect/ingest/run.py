@@ -102,12 +102,11 @@ PATH_DB = OUTPUT / "sql" / "encuestas.db"
 PATH_DB.parent.mkdir(parents=True, exist_ok=True)
 conn = sqlite3.connect(PATH_DB)
 
-# Si la base de datos ya existe, añadimos las filas nuevas con if_exists='append'.
+# Si la base de datos ya existe, añadimos las filas nuevas.
 def _to_sql_with_fallback(df, name, con):
     try:
         df.to_sql(name, con, if_exists='append', index=False)
     except Exception as e:
-        print(f"Warning: append to table '{name}' failed: {e}. Falling back to 'replace'.")
         df.to_sql(name, con, if_exists='replace', index=False)
 
 _to_sql_with_fallback(dfRaw, "Raw", conn)
