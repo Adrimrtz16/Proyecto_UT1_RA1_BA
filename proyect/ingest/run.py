@@ -135,13 +135,23 @@ for area in areas:
         valores[str(satisfaction)].append(porcentaje.iloc[0] if not porcentaje.empty else 0)
 
 dfReport = pd.DataFrame({"": areas, **valores})
+# Calcular medias por departamento (media de 'satisfaction' en dfClean)
+medias = dfClean.groupby('area')['satisfaction'].mean().reindex(areas).fillna(0)
+
+# Formatear medias (2 decimales) en el orden de `areas`
+medias_fmt = {area: f"{medias.loc[area]:.2f}" for area in areas}
 
 txt = (
     f"# Reporte · Encuestas de Satisfacción\n"
     f"**Periodo:** {dfClean['date'].iloc[0]} → {dfClean['date'].iloc[-1]}\n"
     f"**Generado:** {pd.Timestamp.now()}\n\n"
     f"## Distribución 1–10 (%)\n {dfReport.to_markdown()}\n\n"
-    f"## Calidad y cobertura\n\n **Filas iniciales:** {dfRaw.shape[0]} \n **Filas en cuarentena:** {dfQuarantine.shape[0]} \n **Filas finales:** {dfClean.shape[0]}"
+    f"## Calidad y cobertura\n\n **Filas iniciales:** {dfRaw.shape[0]} \n **Filas en cuarentena:** {dfQuarantine.shape[0]} \n **Filas finales:** {dfClean.shape[0]}\n\n"
+    f"## Medias por departamento\n\n"
+    f" **Atención:** {medias_fmt['Atención']}  \n"
+    f" **Soporte:** {medias_fmt['Soporte']}  \n"
+    f" **Ventas:** {medias_fmt['Ventas']}  \n"
+    f" **Marketing:** {medias_fmt['Marketing']}"
 )
 
 REPORT_PATH = ROOT / "output" / "report" / "reporte.md"
