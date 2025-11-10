@@ -18,6 +18,8 @@ start_time = time.time()
 # =============================================================
 previous_month = pd.Timestamp.now() - pd.DateOffset(months=1)
 excel_route = ROOT / 'data' / 'raw' / f'encuestas_{previous_month.strftime("%Y%m")}.xlsx'
+# Nombre del archivo fuente (se usará en varios DataFrames/CSV)
+source_file = f'encuestas_{previous_month.strftime("%Y%m")}.xlsx'
 
 todayDate = datetime.now().strftime('%Y-%m-%d')
 destiny_dir = ROOT / 'data' / 'drops' / todayDate
@@ -35,6 +37,9 @@ df.to_csv(ruta_csv, index=False, encoding='utf-8')
 csv = DATA / "encuestas_raw.csv"
 
 df = pd.read_csv(csv)
+
+# Añadir columna de origen en la fase de ingesta para que el CSV de ingesta la contenga
+df["_source_file"] = source_file
 
 df["date"] = pd.to_datetime(df["date"])
 df['age'] = pd.to_numeric(df['age'], errors='coerce')
@@ -73,6 +78,8 @@ df = df[(df['satisfaction'] >= 1) & (df['satisfaction'] <= 10)]
 
 
 output_csv = DATA / "encuestas_cuarentena.csv"
+# Asegurar que las filas en cuarentena también llevan la referencia al archivo fuente
+removed_satisfaction_range["_source_file"] = source_file
 removed_satisfaction_range.to_csv(output_csv, index=False, na_rep='NaN')
 
 # Detener el cronómetro de _ingest_ts
@@ -107,11 +114,51 @@ def _to_sql_with_fallback(df, name, con):
     try:
         df.to_sql(name, con, if_exists='append', index=False)
     except Exception as e:
+        # En caso de error al hacer append, reemplazamos la tabla completa
         df.to_sql(name, con, if_exists='replace', index=False)
 
-_to_sql_with_fallback(dfRaw, "Raw", conn)
-_to_sql_with_fallback(dfQuarantine, "Quarantine", conn)
-_to_sql_with_fallback(dfClean, "Clean", conn)
+
+# Comprueba si la tabla existe y si tiene filas cuyo source file coincida con el que queremos introducir.
+def _table_has_source(con, table, source):
+    cur = con.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    if cur.fetchone() is None:
+        return False
+    try:
+        cur.execute(f"SELECT COUNT(1) FROM {table} WHERE _source_file = ?", (source,))
+        return cur.fetchone()[0] > 0
+    except Exception:
+        # Si la columna no existe o hay otro error, consideramos que no hay coincidencias
+        return False
+
+# En cuyo caso estemos intentando meter datos del mismo archivo se haya introducido anteriormente sustituirá las filas antiguas por las nuevas
+def replace_rows_if_source_matches(df, table, con):
+    allowed_tables = {"Raw", "Quarantine", "Clean"}
+    if table not in allowed_tables:
+        raise ValueError(f"Tabla no permitida: {table}")
+
+    if '_source_file' in df.columns:
+        unique_sources = df['_source_file'].dropna().unique()
+        if len(unique_sources) == 1:
+            src = unique_sources[0]
+            if _table_has_source(con, table, src):
+                cur = con.cursor()
+                try:
+                    cur.execute(f"DELETE FROM {table} WHERE _source_file = ?", (src,))
+                    con.commit()
+                except Exception as e:
+                    print(f"Warning: fallo al borrar filas de '{table}' con _source_file={src}: {e}")
+                # Insertar las nuevas filas (append tras el borrado)
+                _to_sql_with_fallback(df, table, con)
+                return
+
+    # Si no se cumple la condición de reemplazo, se hace el append habitual
+    _to_sql_with_fallback(df, table, con)
+
+
+replace_rows_if_source_matches(dfRaw, "Raw", conn)
+replace_rows_if_source_matches(dfQuarantine, "Quarantine", conn)
+replace_rows_if_source_matches(dfClean, "Clean", conn)
 
 conn.close()
 
