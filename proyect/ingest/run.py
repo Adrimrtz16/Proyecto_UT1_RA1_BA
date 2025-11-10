@@ -10,7 +10,7 @@ DATA = ROOT / "data" / "drops" / datetime.now().strftime('%Y-%m-%d')
 OUTPUT = ROOT / "output"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
-# Iniciar el cronómetro
+# Iniciar el cronómetro de _ingest_ts
 start_time = time.time()
 
 # =============================================================
@@ -53,7 +53,6 @@ df = pd.read_csv(csv)
 df = df.dropna(subset=['age'])
 df = df.dropna(subset=['satisfaction'])
 
-# Función para normalizar el texto
 def limpiar_texto(text):
     if pd.isna(text):
         return ""
@@ -76,10 +75,9 @@ df = df[(df['satisfaction'] >= 1) & (df['satisfaction'] <= 10)]
 output_csv = DATA / "encuestas_cuarentena.csv"
 removed_satisfaction_range.to_csv(output_csv, index=False, na_rep='NaN')
 
-# Detener el cronómetro
+# Detener el cronómetro de _ingest_ts
 end_time = time.time()
 
-# Calcular el tiempo transcurrido
 elapsed_time = end_time - start_time
 
 df["_ingest_ts"] = elapsed_time
@@ -100,17 +98,14 @@ dfRaw = pd.read_csv(csvRaw)
 dfQuarantine = pd.read_csv(csvQuarantine)
 dfClean = pd.read_csv(csvClean)
 
-# Crear la carpeta padre de PATH_DB si no existe
 PATH_DB = OUTPUT / "sql" / "encuestas.db"
 PATH_DB.parent.mkdir(parents=True, exist_ok=True)
 conn = sqlite3.connect(PATH_DB)
 
-# Guardar cada DataFrame como una tabla
 dfRaw.to_sql("Raw", conn, if_exists="replace", index=False)
 dfQuarantine.to_sql("Quarantine", conn, if_exists="replace", index=False)
 dfClean.to_sql("Clean", conn, if_exists="replace", index=False)
 
-# Cerrar conexión
 conn.close()
 
 # Guardar el DataFrame como archivo Parquet
@@ -135,10 +130,9 @@ for area in areas:
         valores[str(satisfaction)].append(porcentaje.iloc[0] if not porcentaje.empty else 0)
 
 dfReport = pd.DataFrame({"": areas, **valores})
-# Calcular medias por departamento (media de 'satisfaction' en dfClean)
-medias = dfClean.groupby('area')['satisfaction'].mean().reindex(areas).fillna(0)
 
-# Formatear medias (2 decimales) en el orden de `areas`
+# Calcular medias por departamento
+medias = dfClean.groupby('area')['satisfaction'].mean().reindex(areas).fillna(0)
 medias_fmt = {area: f"{medias.loc[area]:.2f}" for area in areas}
 
 txt = (
