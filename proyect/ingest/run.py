@@ -102,14 +102,23 @@ PATH_DB = OUTPUT / "sql" / "encuestas.db"
 PATH_DB.parent.mkdir(parents=True, exist_ok=True)
 conn = sqlite3.connect(PATH_DB)
 
-dfRaw.to_sql("Raw", conn, if_exists="replace", index=False)
-dfQuarantine.to_sql("Quarantine", conn, if_exists="replace", index=False)
-dfClean.to_sql("Clean", conn, if_exists="replace", index=False)
+# Si la base de datos ya existe, añadimos las filas nuevas con if_exists='append'.
+def _to_sql_with_fallback(df, name, con):
+    try:
+        df.to_sql(name, con, if_exists='append', index=False)
+    except Exception as e:
+        print(f"Warning: append to table '{name}' failed: {e}. Falling back to 'replace'.")
+        df.to_sql(name, con, if_exists='replace', index=False)
+
+_to_sql_with_fallback(dfRaw, "Raw", conn)
+_to_sql_with_fallback(dfQuarantine, "Quarantine", conn)
+_to_sql_with_fallback(dfClean, "Clean", conn)
 
 conn.close()
 
-# Guardar el DataFrame como archivo Parquet
-PARQUET_PATH = OUTPUT / "parquet" / "clean_encuestas.parquet"
+# Guardar el DataFrame como archivo Parquet 
+parquet_fname = f"clean_encuestas_{pd.Timestamp.now().strftime('%Y-%m-%d')}.parquet"
+PARQUET_PATH = OUTPUT / "parquet" / parquet_fname
 PARQUET_PATH.parent.mkdir(parents=True, exist_ok=True)
 dfClean.to_parquet(PARQUET_PATH, index=False, engine="pyarrow")
 
