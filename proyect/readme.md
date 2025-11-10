@@ -10,10 +10,12 @@ Este repositorio contiene:
 pip install -r project/requirements.txt
 
 2) Generar datos de ejemplo
-python project/ingest/get_data.py
+cd .\proyect\ingest\    
+python get_data.py
 
 3) Pipeline fin-a-fin (ingesta→clean→persistencia→reporte.md)
-python project/ingest/run.py
+cd .\proyect\ingest\
+python run.py
 
 4) Copiar el reporte a la web Quartz
 python project/tools/copy_report_to_site.py

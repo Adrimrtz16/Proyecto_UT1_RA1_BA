@@ -7,6 +7,7 @@ from pathlib import Path
 # np.random.seed(42)
 
 rows = 200000
+
 typeAreas = ["Atención", "Soporte", "Ventas", "Marketing"]
 typeComents = ["Excelente", "Buenisimo", " ", "Malo", "Horrible"]
 
